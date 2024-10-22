@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// Struktur untuk akun dengan informasi ID, password, saldo, status persetujuan, dan riwayat transaksi
 type Account struct {
 	ID           string
 	Password     string
@@ -19,6 +20,7 @@ type Account struct {
 	Transactions []Transaction
 }
 
+// Struktur untuk transaksi berisi ID transaksi, ID akun, jenis transaksi, jumlah uang, tanggal, dan detail tambahan
 type Transaction struct {
 	ID        int
 	AccountID string
@@ -28,11 +30,13 @@ type Transaction struct {
 	Details   string
 }
 
+// Struktur untuk pendaftaran akun, hanya berisi ID dan password
 type Registration struct {
 	ID       string
 	Password string
 }
 
+// Struktur untuk permintaan top-up dengan ID permintaan, ID akun, jumlah, tanggal, dan status persetujuan
 type TopUpRequest struct {
 	ID        int
 	AccountID string
@@ -41,25 +45,30 @@ type TopUpRequest struct {
 	Approved  bool
 }
 
+// Deklarasi variabel global untuk menyimpan data akun, registrasi, permintaan top-up, dan mutex untuk sinkronisasi
 var (
-	accounts      = make(map[string]*Account)
-	registrations = make(map[string]Registration)
-	topUpRequests = []TopUpRequest{}
-	mu            sync.Mutex
-	currentUser   *Account
-	nextTopUpID   = 1
+	accounts      = make(map[string]*Account)   // Menyimpan akun yang sudah terdaftar
+	registrations = make(map[string]Registration) // Menyimpan data registrasi akun yang belum disetujui
+	topUpRequests = []TopUpRequest{} // Menyimpan daftar permintaan top-up
+	mu            sync.Mutex        // Mutex untuk menghindari kondisi balapan (race conditions)
+	currentUser   *Account          // Menyimpan akun yang saat ini sedang login
+	nextTopUpID   = 1               // ID unik untuk permintaan top-up berikutnya
 )
 
-const accountsFilePath = "accounts.json"
+const accountsFilePath = "accounts.json" // Lokasi file untuk menyimpan data akun
 
 func main() {
+	// Memuat akun dari file jika ada
 	loadAccounts()
-	defer saveAccounts()
+	defer saveAccounts() // Menyimpan akun saat program berakhir
 
+	// Membaca input dari pengguna
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Println("Welcome to the e-money system!")
 
+	// Cek apakah file akun kosong atau tidak
 	if isEmptyAccountsFile() {
+		// Jika tidak ada akun, menawarkan untuk registrasi atau login admin
 		fmt.Println("No accounts found. Please register as admin or register a new account.")
 		for {
 			fmt.Println("1. Admin Login")
@@ -73,11 +82,11 @@ func main() {
 			option := scanner.Text()
 			switch option {
 			case "1":
-				if loginadm(scanner) {
-					adminMenu(scanner)
+				if loginadm(scanner) { // Login admin
+					adminMenu(scanner) // Menu admin
 				}
 			case "2":
-				registerAccount(scanner)
+				registerAccount(scanner) // Pendaftaran akun
 			case "3":
 				fmt.Println("Goodbye!")
 				return
@@ -86,6 +95,7 @@ func main() {
 			}
 		}
 	} else {
+		// Jika ada akun, menawarkan login pengguna atau admin
 		fmt.Println("Choose an option:")
 		fmt.Println("1. User Login")
 		fmt.Println("2. Admin Login")
@@ -100,15 +110,15 @@ func main() {
 			option := scanner.Text()
 			switch option {
 			case "1":
-				if loginusr(scanner) {
-					userMenu(scanner)
+				if loginusr(scanner) { // Login pengguna
+					userMenu(scanner) // Menu pengguna
 				}
 			case "2":
-				if loginadm(scanner) {
-					adminMenu(scanner)
+				if loginadm(scanner) { // Login admin
+					adminMenu(scanner) // Menu admin
 				}
 			case "3":
-				registerAccount(scanner)
+				registerAccount(scanner) // Pendaftaran akun
 			case "4":
 				fmt.Println("Goodbye!")
 				return
@@ -119,6 +129,7 @@ func main() {
 	}
 }
 
+// Fungsi untuk mengecek apakah file akun kosong atau tidak
 func isEmptyAccountsFile() bool {
 	data, err := os.ReadFile(accountsFilePath)
 	if err != nil {
@@ -130,6 +141,7 @@ func isEmptyAccountsFile() bool {
 	return len(data) == 0
 }
 
+// Fungsi untuk mendaftarkan akun baru
 func registerAccount(scanner *bufio.Scanner) {
 	fmt.Print("Enter account ID: ")
 	if !scanner.Scan() {
@@ -143,7 +155,7 @@ func registerAccount(scanner *bufio.Scanner) {
 	}
 	password := scanner.Text()
 
-	mu.Lock()
+	mu.Lock() // Kunci mutex untuk sinkronisasi
 	defer mu.Unlock()
 
 	if _, exists := accounts[id]; exists {
@@ -157,6 +169,7 @@ func registerAccount(scanner *bufio.Scanner) {
 	fmt.Println("Registration submitted for approval.")
 }
 
+// Fungsi untuk login admin
 func loginadm(scanner *bufio.Scanner) bool {
 	fmt.Print("Enter admin ID: ")
 	if !scanner.Scan() {
@@ -170,7 +183,7 @@ func loginadm(scanner *bufio.Scanner) bool {
 	}
 	password := scanner.Text()
 
-	mu.Lock()
+	mu.Lock() // Kunci mutex untuk sinkronisasi
 	defer mu.Unlock()
 
 	if id == "admin" && password == "admin" {
@@ -182,6 +195,7 @@ func loginadm(scanner *bufio.Scanner) bool {
 	return false
 }
 
+// Fungsi untuk login pengguna
 func loginusr(scanner *bufio.Scanner) bool {
 	fmt.Print("Enter account ID: ")
 	if !scanner.Scan() {
@@ -195,7 +209,7 @@ func loginusr(scanner *bufio.Scanner) bool {
 	}
 	password := scanner.Text()
 
-	mu.Lock()
+	mu.Lock() // Kunci mutex untuk sinkronisasi
 	defer mu.Unlock()
 
 	account, exists := accounts[id]
@@ -208,6 +222,7 @@ func loginusr(scanner *bufio.Scanner) bool {
 	return true
 }
 
+// Menu untuk pengguna dengan berbagai opsi seperti cek saldo, transfer uang, pembayaran, dll.
 func userMenu(scanner *bufio.Scanner) {
 	for {
 		fmt.Println("1. Check Balance")
@@ -224,17 +239,17 @@ func userMenu(scanner *bufio.Scanner) {
 		option := scanner.Text()
 		switch option {
 		case "1":
-			checkBalance()
+			checkBalance() // Cek saldo akun
 		case "2":
-			transferMoney(scanner)
+			transferMoney(scanner) // Transfer uang ke akun lain
 		case "3":
-			makePayment(scanner)
+			makePayment(scanner) // Melakukan pembayaran
 		case "4":
-			printTransactionHistory()
+			printTransactionHistory() // Cetak riwayat transaksi
 		case "5":
-			topUpBalance(scanner)
+			topUpBalance(scanner) // Mengisi saldo akun
 		case "6":
-			currentUser = nil
+			currentUser = nil // Logout pengguna
 			return
 		default:
 			fmt.Println("Invalid option. Please try again.")
@@ -242,6 +257,7 @@ func userMenu(scanner *bufio.Scanner) {
 	}
 }
 
+// Menu untuk admin untuk mengelola pendaftaran dan permintaan top-up
 func adminMenu(scanner *bufio.Scanner) {
 	for {
 		fmt.Println("1. Approve/Reject Registration")
@@ -256,13 +272,13 @@ func adminMenu(scanner *bufio.Scanner) {
 		option := scanner.Text()
 		switch option {
 		case "1":
-			handleRegistrations(scanner)
+			handleRegistrations(scanner) // Menangani pendaftaran akun baru
 		case "2":
-			printAccountList()
+			printAccountList() // Cetak daftar akun
 		case "3":
-			handleTopUpRequests(scanner)
+			handleTopUpRequests(scanner) // Menangani permintaan top-up
 		case "4":
-			currentUser = nil
+			currentUser = nil // Logout admin
 			return
 		default:
 			fmt.Println("Invalid option. Please try again.")
@@ -270,6 +286,7 @@ func adminMenu(scanner *bufio.Scanner) {
 	}
 }
 
+// Fungsi untuk menangani persetujuan pendaftaran akun baru oleh admin
 func handleRegistrations(scanner *bufio.Scanner) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -285,10 +302,11 @@ func handleRegistrations(scanner *bufio.Scanner) {
 		} else {
 			fmt.Println("Account rejected.")
 		}
-		delete(registrations, id)
+		delete(registrations, id) // Hapus dari pendaftaran setelah diproses
 	}
 }
 
+// Fungsi untuk mencetak daftar akun
 func printAccountList() {
 	mu.Lock()
 	defer mu.Unlock()
@@ -299,6 +317,7 @@ func printAccountList() {
 	}
 }
 
+// Fungsi untuk mengecek saldo akun pengguna
 func checkBalance() {
 	mu.Lock()
 	defer mu.Unlock()
@@ -307,40 +326,48 @@ func checkBalance() {
 }
 
 func transferMoney(scanner *bufio.Scanner) {
+	// Meminta ID akun penerima
 	fmt.Print("Enter recipient account ID: ")
 	if !scanner.Scan() {
 		return
 	}
 	recipientID := scanner.Text()
 
+	// Meminta jumlah uang yang ingin ditransfer
 	fmt.Print("Enter amount to transfer: ")
 	if !scanner.Scan() {
 		return
 	}
 	amountStr := scanner.Text()
 	amount, err := strconv.ParseFloat(amountStr, 64)
+	// Validasi apakah jumlah uang yang dimasukkan valid atau tidak
 	if err != nil || amount <= 0 {
 		fmt.Println("Invalid amount.")
 		return
 	}
 
-	mu.Lock()
+	mu.Lock()  // Mengunci agar thread-safe ketika melakukan transaksi
 	defer mu.Unlock()
 
+	// Mencari akun penerima berdasarkan ID yang diberikan
 	recipient, exists := accounts[recipientID]
 	if !exists {
-		fmt.Println("Recipient account not found.")
+		fmt.Println("Recipient account not found.") // Jika akun penerima tidak ditemukan
 		return
 	}
 
+	// Mengecek apakah saldo mencukupi untuk transfer
 	if currentUser.Balance < amount {
-		fmt.Println("Insufficient funds.")
+		fmt.Println("Insufficient funds.") // Jika saldo tidak mencukupi
 		return
 	}
 
+	// Mengurangi saldo dari akun pengirim
 	currentUser.Balance -= amount
+	// Menambah saldo ke akun penerima
 	recipient.Balance += amount
 
+	// Menambahkan transaksi ke riwayat transaksi akun pengirim
 	transaction := Transaction{
 		ID:        len(currentUser.Transactions) + 1,
 		AccountID: currentUser.ID,
@@ -351,6 +378,7 @@ func transferMoney(scanner *bufio.Scanner) {
 	}
 	currentUser.Transactions = append(currentUser.Transactions, transaction)
 
+	// Menambahkan transaksi ke riwayat transaksi akun penerima
 	recipient.Transactions = append(recipient.Transactions, Transaction{
 		ID:        len(recipient.Transactions) + 1,
 		AccountID: recipient.ID,
@@ -360,8 +388,10 @@ func transferMoney(scanner *bufio.Scanner) {
 		Details:   fmt.Sprintf("Received from %s", currentUser.ID),
 	})
 
+	// Konfirmasi bahwa transfer berhasil dilakukan
 	fmt.Println("Transfer successful.")
 }
+
 
 func makePayment(scanner *bufio.Scanner) {
 	fmt.Print("Enter payment type (e.g., food, phone, electricity, BPJS): ")
