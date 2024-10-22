@@ -1,0 +1,9 @@
+{
+  "faiz": {
+    "ID": "faiz",
+    "Password": "1234",
+    "Balance": 100000,
+    "Approved": true,
+    "Transactions": null
+  }
+}
